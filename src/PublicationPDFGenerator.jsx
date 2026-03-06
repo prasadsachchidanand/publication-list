@@ -1,22 +1,23 @@
 import { useState, useEffect } from "react";
-import { Download, FilePlus, Trash2, ArrowUp, ArrowDown, Edit, Save, X, Star, Palette } from "lucide-react";
+import { Download, FilePlus, Trash2, ArrowUp, ArrowDown, Edit, Save, X, Star, Palette, LogIn, LogOut, Lock } from "lucide-react";
 import { jsPDF } from "jspdf";
 
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc } from "firebase/firestore";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc, getDoc } from "firebase/firestore";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDDO19gT1YeW4NjoZDxz1C9LTbwS2pQEIY",
-  authDomain: "publication-data.firebaseapp.com",
-  projectId: "publication-data",
-  storageBucket: "publication-data.firebasestorage.app",
-  messagingSenderId: "741450305105",
-  appId: "1:741450305105:web:33ebd681c014f492a6f270",
-  measurementId: "G-0HTSTJF9QY"
+  apiKey: "AIzaSyAvTBQfaLRi-PumdUR_-YLcO8ws5knQWyw",
+  authDomain: "publication-data-33a4a.firebaseapp.com",
+  projectId: "publication-data-33a4a",
+  storageBucket: "publication-data-33a4a.firebasestorage.app",
+  messagingSenderId: "211832161346",
+  appId: "1:211832161346:web:0e69405e7b316b07c399db"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const EMPTY_PUB = { authors: "", title: "", journal: "", volume: "", pageNumbers: "", month: "", year: "", doi: "" };
@@ -37,7 +38,7 @@ const BG_COLOR_OPTIONS = [
 const SUPERSCRIPT_MAP = {
   '0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹',
   'a':'ᵃ','b':'ᵇ','c':'ᶜ','d':'ᵈ','e':'ᵉ','f':'ᶠ','g':'ᵍ','h':'ʰ','i':'ⁱ','j':'ʲ',
-  'k':'ᵏ','l':'ˡ','m':'ᵐ','n':'ⁿ','o':'ᵒ','p':'ᵖ','r':'ʳ','s':'ˢ','t':'ᵗ','u':'ᵘ',
+  'k':'ᵏ','l':'ˡ','m':'ᵐ','o':'ᵒ','p':'ᵖ','r':'ʳ','s':'ˢ','t':'ᵗ','u':'ᵘ',
   'v':'ᵛ','w':'ʷ','x':'ˣ','y':'ʸ','z':'ᶻ',
   'A':'ᴬ','B':'ᴮ','D':'ᴰ','E':'ᴱ','G':'ᴳ','H':'ᴴ','I':'ᴵ','J':'ᴶ','K':'ᴷ','L':'ᴸ',
   'M':'ᴹ','N':'ᴺ','O':'ᴼ','P':'ᴾ','R':'ᴿ','T':'ᵀ','U':'ᵁ','V':'ⱽ','W':'ᵂ',
@@ -89,7 +90,6 @@ function convertLatexInner(inner) {
   s = s.replace(/[{}]/g, '');
   return s;
 }
-// ──────────────────────────────────────────────────────────
 
 // ── Order persistence helpers ──────────────────────────────
 const ORDER_DOC_ID = "publication_order";
@@ -98,14 +98,12 @@ async function saveOrderToFirestore(orderedIds) {
   try {
     await setDoc(doc(db, "meta", ORDER_DOC_ID), { order: orderedIds });
   } catch (e) {
-    // fallback: localStorage
     localStorage.setItem("pub_order", JSON.stringify(orderedIds));
   }
 }
 
 async function loadOrderFromFirestore() {
   try {
-    const { getDoc } = await import("firebase/firestore");
     const snap = await getDoc(doc(db, "meta", ORDER_DOC_ID));
     if (snap.exists()) return snap.data().order || [];
   } catch (e) {}
@@ -121,13 +119,81 @@ function applyOrder(pubs, order) {
   const unordered = pubs.filter(p => !order.includes(p.id));
   return [...ordered, ...unordered];
 }
-// ──────────────────────────────────────────────────────────
 
+// ── Login Modal ────────────────────────────────────────────
+function LoginModal({ onClose }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      onClose();
+    } catch (e) {
+      setError("Invalid email or password. Please try again.");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Lock size={20} className="text-purple-800" />
+            <h2 className="text-xl font-bold text-purple-900">Admin Login</h2>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+        <p className="text-sm text-gray-500 mb-4">Sign in to add, edit, or delete publications.</p>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input
+              type="email" value={email} onChange={e => setEmail(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-400"
+              placeholder="your@email.com"
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <input
+              type="password" value={password} onChange={e => setPassword(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-400"
+              placeholder="••••••••"
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            />
+          </div>
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+          <button
+            onClick={handleLogin} disabled={loading}
+            className="w-full py-2 bg-purple-800 text-white rounded hover:bg-purple-900 font-medium disabled:opacity-60 transition-colors"
+          >
+            {loading ? "Signing in..." : "Sign In"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────
 function PublicationPDFGenerator() {
   const [publications, setPublications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [currentPublication, setCurrentPublication] = useState({ ...EMPTY_PUB });
+
+  // Auth state
+  const [user, setUser] = useState(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Best publications selection
   const [bestMode, setBestMode] = useState(false);
@@ -138,6 +204,11 @@ function PublicationPDFGenerator() {
   const [pdfBgColor, setPdfBgColor] = useState(BG_COLOR_OPTIONS[0]);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [customColor, setCustomColor] = useState("#FCF8E3");
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => { fetchPublications(); }, []);
 
@@ -152,7 +223,6 @@ function PublicationPDFGenerator() {
       querySnapshot.forEach((d) => fetched.push({ id: d.id, ...d.data() }));
       setPublications(applyOrder(fetched, savedOrder));
     } catch (error) {
-      console.error("Error fetching publications:", error);
       try {
         const saved = JSON.parse(localStorage.getItem('publications')) || [];
         setPublications(saved);
@@ -161,10 +231,8 @@ function PublicationPDFGenerator() {
     setLoading(false);
   };
 
-  // Save order whenever publications array changes (but not during initial load)
   const saveCurrentOrder = async (pubs) => {
-    const ids = pubs.map(p => p.id);
-    await saveOrderToFirestore(ids);
+    await saveOrderToFirestore(pubs.map(p => p.id));
   };
 
   const handleChange = (e) => {
@@ -179,6 +247,7 @@ function PublicationPDFGenerator() {
   };
 
   const addPublication = async () => {
+    if (!user) { setShowLoginModal(true); return; }
     if (!currentPublication.authors || !currentPublication.title || !currentPublication.journal) {
       alert("Authors, Title, and Journal are required fields");
       return;
@@ -191,51 +260,37 @@ function PublicationPDFGenerator() {
       setCurrentPublication({ ...EMPTY_PUB });
     } catch (error) {
       console.error("Error adding document:", error);
-      try {
-        const newPub = { ...currentPublication, id: Date.now().toString() };
-        const updated = [...publications, newPub];
-        localStorage.setItem('publications', JSON.stringify(updated));
-        setPublications(updated);
-        await saveCurrentOrder(updated);
-        setCurrentPublication({ ...EMPTY_PUB });
-      } catch (e) { console.error(e); }
     }
   };
 
   const updatePublication = async () => {
+    if (!user) { setShowLoginModal(true); return; }
     if (!editingId) return;
     const updatedPub = publications.find(pub => pub.id === editingId);
     try {
       await updateDoc(doc(db, "publications", editingId), updatedPub);
       setEditingId(null);
     } catch (error) {
-      try {
-        localStorage.setItem('publications', JSON.stringify(publications));
-        setEditingId(null);
-      } catch (e) { console.error(e); }
+      console.error("Error updating document:", error);
     }
   };
 
   const removePublication = async (id) => {
+    if (!user) { setShowLoginModal(true); return; }
+    if (!window.confirm("Are you sure you want to delete this publication?")) return;
     try {
       await deleteDoc(doc(db, "publications", id));
       const updated = publications.filter(pub => pub.id !== id);
-      localStorage.setItem('publications', JSON.stringify(updated));
       setPublications(updated);
       await saveCurrentOrder(updated);
       setSelectedBest(prev => prev.filter(sid => sid !== id));
     } catch (error) {
-      try {
-        const updated = publications.filter(pub => pub.id !== id);
-        localStorage.setItem('publications', JSON.stringify(updated));
-        setPublications(updated);
-        await saveCurrentOrder(updated);
-        setSelectedBest(prev => prev.filter(sid => sid !== id));
-      } catch (e) { console.error(e); }
+      console.error("Error deleting document:", error);
     }
   };
 
   const movePublication = async (id, direction) => {
+    if (!user) { setShowLoginModal(true); return; }
     const index = publications.findIndex(pub => pub.id === id);
     if ((direction === 'up' && index === 0) || (direction === 'down' && index === publications.length - 1)) return;
     const newIndex = direction === 'up' ? index - 1 : index + 1;
@@ -243,8 +298,6 @@ function PublicationPDFGenerator() {
     const [moved] = updated.splice(index, 1);
     updated.splice(newIndex, 0, moved);
     setPublications(updated);
-    localStorage.setItem('publications', JSON.stringify(updated));
-    // ✅ Save order to Firestore so it persists on reload
     await saveCurrentOrder(updated);
   };
 
@@ -272,7 +325,6 @@ function PublicationPDFGenerator() {
     );
   };
 
-  // Resolve the active background RGB for PDF
   const getActiveBgRgb = () => {
     if (pdfBgColor.value === "__custom__") {
       const hex = customColor.replace('#', '');
@@ -284,7 +336,6 @@ function PublicationPDFGenerator() {
     return pdfBgColor.rgb;
   };
 
-  // ── Shared PDF builder ─────────────────────────────────────
   const buildPDF = (pubList, headerTitle) => {
     const pdfdoc = new jsPDF();
     const pageW = pdfdoc.internal.pageSize.width;
@@ -298,17 +349,14 @@ function PublicationPDFGenerator() {
     };
 
     addBg();
-
     pdfdoc.setFont("times", "bold");
     pdfdoc.setFontSize(22);
     pdfdoc.setTextColor(70, 10, 100);
     pdfdoc.text(headerTitle, pageW / 2, 25, { align: 'center' });
-
     pdfdoc.setFont("times", "italic");
     pdfdoc.setFontSize(11);
     pdfdoc.setTextColor(80, 80, 80);
     pdfdoc.text("Sachchidanand Prasad", pageW / 2, 35, { align: 'center' });
-
     pdfdoc.setDrawColor(70, 10, 100);
     pdfdoc.setLineWidth(0.5);
     pdfdoc.line(margin, 40, pageW - margin, 40);
@@ -397,15 +445,12 @@ function PublicationPDFGenerator() {
     buildPDF(bestPubs, `Best ${bestPubs.length} Research Publications`).save('best-publications.pdf');
   };
 
-  // ── Color Picker Panel ─────────────────────────────────────
   const ColorPickerPanel = () => (
     <div className="absolute z-50 right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl p-4 w-72">
       <p className="text-sm font-semibold text-gray-700 mb-3">PDF Background Color</p>
       <div className="grid grid-cols-4 gap-2 mb-3">
         {BG_COLOR_OPTIONS.map(opt => (
-          <button
-            key={opt.value}
-            title={opt.label}
+          <button key={opt.value} title={opt.label}
             onClick={() => { setPdfBgColor(opt); setShowColorPicker(false); }}
             className={`w-full aspect-square rounded-lg border-2 transition-all ${
               pdfBgColor.value === opt.value ? 'border-purple-600 scale-110 shadow-md' : 'border-gray-200 hover:border-purple-300'
@@ -414,7 +459,7 @@ function PublicationPDFGenerator() {
           />
         ))}
       </div>
-      <div className="grid grid-cols-4 gap-2 mb-1 px-0">
+      <div className="grid grid-cols-4 gap-2 mb-1">
         {BG_COLOR_OPTIONS.map(opt => (
           <p key={opt.value} className="text-center text-xs text-gray-500 leading-tight">{opt.label}</p>
         ))}
@@ -422,26 +467,12 @@ function PublicationPDFGenerator() {
       <div className="mt-3 border-t pt-3">
         <p className="text-xs font-medium text-gray-600 mb-2">Custom color</p>
         <div className="flex items-center gap-2">
-          <input
-            type="color"
-            value={customColor}
-            onChange={e => setCustomColor(e.target.value)}
-            className="w-10 h-10 rounded cursor-pointer border border-gray-300"
-          />
-          <input
-            type="text"
-            value={customColor}
-            onChange={e => setCustomColor(e.target.value)}
-            className="flex-1 p-1.5 text-sm border border-gray-300 rounded font-mono"
-            placeholder="#RRGGBB"
-          />
-          <button
-            onClick={() => {
-              setPdfBgColor({ label: "Custom", value: "__custom__", rgb: [] });
-              setShowColorPicker(false);
-            }}
-            className="px-2 py-1.5 bg-purple-700 text-white text-xs rounded hover:bg-purple-800"
-          >
+          <input type="color" value={customColor} onChange={e => setCustomColor(e.target.value)}
+            className="w-10 h-10 rounded cursor-pointer border border-gray-300" />
+          <input type="text" value={customColor} onChange={e => setCustomColor(e.target.value)}
+            className="flex-1 p-1.5 text-sm border border-gray-300 rounded font-mono" placeholder="#RRGGBB" />
+          <button onClick={() => { setPdfBgColor({ label: "Custom", value: "__custom__", rgb: [] }); setShowColorPicker(false); }}
+            className="px-2 py-1.5 bg-purple-700 text-white text-xs rounded hover:bg-purple-800">
             Use
           </button>
         </div>
@@ -449,32 +480,49 @@ function PublicationPDFGenerator() {
     </div>
   );
 
-  const activeBgLabel = pdfBgColor.value === "__custom__" ? `Custom (${customColor})` : pdfBgColor.label;
   const activeBgPreview = pdfBgColor.value === "__custom__" ? customColor : pdfBgColor.value;
+  const activeBgLabel = pdfBgColor.value === "__custom__" ? `Custom (${customColor})` : pdfBgColor.label;
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-yellow-50 rounded-lg shadow-lg">
-      <h1 className="text-3xl font-bold text-center mb-6 text-purple-900">Research Publication PDF Generator</h1>
+
+      {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
+
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold text-purple-900">Research Publication PDF Generator</h1>
+        <div>
+          {user ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 hidden sm:block">{user.email}</span>
+              <button onClick={() => signOut(auth)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium transition-colors">
+                <LogOut size={14} /> Logout
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setShowLoginModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-800 rounded-lg hover:bg-purple-200 text-sm font-medium transition-colors">
+              <LogIn size={14} /> Admin Login
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* ── PDF Background Color Selector ── */}
       <div className="relative flex justify-end mb-4">
-        <button
-          onClick={() => setShowColorPicker(v => !v)}
-          className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 text-sm font-medium text-gray-700 transition-colors"
-        >
+        <button onClick={() => setShowColorPicker(v => !v)}
+          className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 text-sm font-medium text-gray-700 transition-colors">
           <Palette size={16} className="text-purple-700" />
           PDF Background:
-          <span
-            className="inline-block w-5 h-5 rounded border border-gray-300"
-            style={{ backgroundColor: activeBgPreview }}
-          />
+          <span className="inline-block w-5 h-5 rounded border border-gray-300" style={{ backgroundColor: activeBgPreview }} />
           <span className="text-gray-600">{activeBgLabel}</span>
         </button>
         {showColorPicker && <ColorPickerPanel />}
       </div>
 
-      {/* ── Add Publication Form ── */}
-      {!editingId && (
+      {/* ── Add Publication Form (only when logged in) ── */}
+      {user && !editingId && (
         <div className="bg-white p-6 rounded-lg shadow mb-8 border-l-4 border-purple-800">
           <h2 className="text-xl font-semibold mb-4 text-purple-800">Add Publication Details</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -540,19 +588,31 @@ function PublicationPDFGenerator() {
         </div>
       )}
 
+      {/* ── Not logged in banner ── */}
+      {!user && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-purple-800">
+            <Lock size={16} />
+            <span className="text-sm">You are viewing in read-only mode. Login to add or edit publications.</span>
+          </div>
+          <button onClick={() => setShowLoginModal(true)}
+            className="text-sm px-3 py-1 bg-purple-800 text-white rounded hover:bg-purple-900 transition-colors">
+            Login
+          </button>
+        </div>
+      )}
+
       {/* ── Publications List ── */}
       <div className="bg-white p-6 rounded-lg shadow mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-purple-800">Publications List</h2>
           {!loading && publications.length > 0 && (
-            <button
-              onClick={() => setBestMode(v => !v)}
+            <button onClick={() => setBestMode(v => !v)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${
                 bestMode
                   ? 'bg-amber-400 text-white border-amber-400 hover:bg-amber-500'
                   : 'bg-white text-amber-600 border-amber-400 hover:bg-amber-50'
-              }`}
-            >
+              }`}>
               <Star size={14} className={bestMode ? 'fill-white' : 'fill-amber-400 text-amber-400'} />
               {bestMode ? 'Done Selecting' : 'Select Best Publications'}
             </button>
@@ -562,15 +622,13 @@ function PublicationPDFGenerator() {
         {bestMode && (
           <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex flex-wrap items-center gap-3 text-sm">
             <span className="text-amber-800 font-medium">Select best</span>
-            <input
-              type="number" min={1} max={publications.length || 20} value={bestLimit}
+            <input type="number" min={1} max={publications.length || 20} value={bestLimit}
               onChange={e => {
                 const val = Math.max(1, parseInt(e.target.value) || 1);
                 setBestLimit(val);
                 if (selectedBest.length > val) setSelectedBest(prev => prev.slice(0, val));
               }}
-              className="w-14 p-1 border border-amber-300 rounded text-center focus:ring-2 focus:ring-amber-400"
-            />
+              className="w-14 p-1 border border-amber-300 rounded text-center focus:ring-2 focus:ring-amber-400" />
             <span className="text-amber-800 font-medium">publications</span>
             <div className="flex items-center gap-2 ml-auto">
               <div className="w-32 bg-gray-200 rounded-full h-2">
@@ -600,7 +658,6 @@ function PublicationPDFGenerator() {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Authors</label>
                       <input type="text" name="authors" value={pub.authors} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded" />
-                      <p className="text-xs text-gray-500 mt-1">Separate authors with commas (,)</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
@@ -651,15 +708,11 @@ function PublicationPDFGenerator() {
                   <div className="flex items-start gap-3">
                     {bestMode && (
                       <div className="pt-1 flex-shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={selectedBest.includes(pub.id)}
+                        <input type="checkbox" checked={selectedBest.includes(pub.id)}
                           onChange={() => toggleBestSelection(pub.id)}
-                          className="w-5 h-5 accent-amber-500 cursor-pointer rounded"
-                        />
+                          className="w-5 h-5 accent-amber-500 cursor-pointer rounded" />
                       </div>
                     )}
-
                     <div className="flex-grow min-w-0">
                       {selectedBest.includes(pub.id) && (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full mb-1">
@@ -686,23 +739,24 @@ function PublicationPDFGenerator() {
                         </p>
                       )}
                     </div>
-
-                    <div className="flex flex-col space-y-1 flex-shrink-0">
-                      <button onClick={() => movePublication(pub.id, 'up')} disabled={index === 0}
-                        className={`text-purple-700 hover:text-purple-900 ${index === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}>
-                        <ArrowUp size={18} />
-                      </button>
-                      <button onClick={() => movePublication(pub.id, 'down')} disabled={index === publications.length - 1}
-                        className={`text-purple-700 hover:text-purple-900 ${index === publications.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}`}>
-                        <ArrowDown size={18} />
-                      </button>
-                      <button onClick={() => setEditingId(pub.id)} className="text-blue-600 hover:text-blue-800">
-                        <Edit size={18} />
-                      </button>
-                      <button onClick={() => removePublication(pub.id)} className="text-red-500 hover:text-red-700">
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
+                    {user && (
+                      <div className="flex flex-col space-y-1 flex-shrink-0">
+                        <button onClick={() => movePublication(pub.id, 'up')} disabled={index === 0}
+                          className={`text-purple-700 hover:text-purple-900 ${index === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                          <ArrowUp size={18} />
+                        </button>
+                        <button onClick={() => movePublication(pub.id, 'down')} disabled={index === publications.length - 1}
+                          className={`text-purple-700 hover:text-purple-900 ${index === publications.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                          <ArrowDown size={18} />
+                        </button>
+                        <button onClick={() => setEditingId(pub.id)} className="text-blue-600 hover:text-blue-800">
+                          <Edit size={18} />
+                        </button>
+                        <button onClick={() => removePublication(pub.id)} className="text-red-500 hover:text-red-700">
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -723,7 +777,7 @@ function PublicationPDFGenerator() {
               <li key={pub.id} className="text-sm text-gray-700 flex items-start gap-2">
                 <span className="font-bold text-amber-600 flex-shrink-0 w-5">{i + 1}.</span>
                 <span className="flex-grow line-clamp-1">{pub.title}</span>
-                <button onClick={() => toggleBestSelection(pub.id)} className="flex-shrink-0 text-gray-400 hover:text-red-500" title="Remove from best">
+                <button onClick={() => toggleBestSelection(pub.id)} className="flex-shrink-0 text-gray-400 hover:text-red-500">
                   <X size={14} />
                 </button>
               </li>
@@ -755,10 +809,8 @@ function PublicationPDFGenerator() {
       </div>
 
       <div className="mt-6 text-center text-sm text-gray-600 space-y-1">
-        <p>* Required fields</p>
-        <p>Use the <strong>PDF Background</strong> button (top right) to choose your PDF paper color.</p>
+        <p>Use the <strong>PDF Background</strong> button to choose your PDF paper color.</p>
         <p>Publications by Sachchidanand Prasad will be highlighted with bold text.</p>
-        <p>Please separate author names with commas for proper formatting in the PDF.</p>
       </div>
     </div>
   );
