@@ -1,16 +1,35 @@
-# React + Vite
+# Publication List
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A web-based application for managing and generating formatted PDF documents of academic research publications.
 
-Currently, two official plugins are available:
+## Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+This application provides a streamlined interface for maintaining a personal list of research publications. It is designed for academic researchers who need to maintain an up-to-date, well-formatted list of their scholarly work. Publication data is stored persistently in the cloud and can be exported as a professionally formatted PDF at any time.
 
-## React Compiler
+## Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Add and manage publications** — Store details including authors, title, journal name, volume, page numbers, publication date, and DOI.
+- **Persistent cloud storage** — Publication data and custom ordering are saved via Firebase Firestore and remain consistent across sessions and devices.
+- **Custom ordering** — Publications can be manually reordered; the arrangement is preserved on reload.
+- **LaTeX support** — Titles and journal names support LaTeX-style mathematical notation (e.g. `$\alpha$`, `$H_2O$`, `$E=mc^2$`), which is automatically converted to Unicode for display and PDF output.
+- **PDF generation** — Export all publications or a selected subset as a formatted PDF document in a classic academic style, with author name highlighted in bold.
+- **Best publications selection** — Select and export a curated subset of publications as a separate PDF.
+- **Customisable PDF background** — Choose from preset paper colours or define a custom colour for the PDF background.
 
-## Expanding the ESLint configuration
+## Live Application
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The application is accessible at:  
+**[https://prasadsachchidanand.github.io/publication-list/](https://prasadsachchidanand.github.io/publication-list/)**
+
+## Technology
+
+- [React](https://react.dev/) — User interface
+- [Vite](https://vite.dev/) — Build tooling
+- [Firebase Firestore](https://firebase.google.com/docs/firestore) — Cloud database
+- [jsPDF](https://github.com/parallax/jsPDF) — PDF generation
+- [Tailwind CSS](https://tailwindcss.com/) — Styling
+- [GitHub Actions](https://github.com/features/actions) — Automated deployment to GitHub Pages
+
+## Author
+
+**Sachchidanand Prasad**
